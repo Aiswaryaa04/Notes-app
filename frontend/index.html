@@ -1,69 +1,107 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en">
 
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Second Brain</title>
+  <title>Yoution</title>
   <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 </head>
 
 <body>
-
   <div class="app">
 
-    <!-- SIDEBAR -->
     <div class="sidebar">
-      <div class="logo">🧠 Second Brain</div>
-
-      <div class="streak-card">
-        <div class="streak-number" id="streak-count">0</div>
-        <div class="streak-label">day streak 🔥</div>
+      <div class="logo">
+        <i class="ti ti-brain logo-icon" aria-hidden="true"></i>
+        <span class="logo-text">Yoution</span>
       </div>
 
-      <div class="sidebar-section">
-        <div class="sidebar-label">Ask your notes</div>
-        <textarea id="ask-input" placeholder="What did I write about...?"></textarea>
-        <button class="ask-btn" id="ask-btn">Ask AI 💬</button>
-        <div id="ask-answer" class="ask-answer" style="display:none;"></div>
+      <nav class="nav">
+        <div class="nav-item active" id="nav-all">
+          <i class="ti ti-notes" aria-hidden="true"></i> All notes
+        </div>
+        <div class="nav-item" id="nav-pinned">
+          <i class="ti ti-pin" aria-hidden="true"></i> Pinned
+        </div>
+        <div class="nav-item" id="nav-search">
+          <i class="ti ti-search" aria-hidden="true"></i> Search
+        </div>
+      </nav>
+
+      <div class="section-lbl">Tags</div>
+      <div id="tag-list" class="tag-list"></div>
+
+      <div class="streak-box">
+        <div class="streak-left">
+          <i class="ti ti-flame streak-icon" aria-hidden="true"></i>
+          <span class="streak-num" id="streak-count">0</span>
+        </div>
+        <div class="streak-right">
+          <div class="streak-lbl">day streak</div>
+          <div class="streak-sub">keep going!</div>
+        </div>
       </div>
 
-      <div class="sidebar-section">
-        <div class="sidebar-label">Filter by tag</div>
-        <div id="tag-filters" class="tag-filters"></div>
+      <div class="theme-toggle" id="theme-toggle">
+        <i class="ti ti-moon" aria-hidden="true"></i>
+        <span>Dark mode</span>
       </div>
-
-      <div class="theme-toggle" id="theme-toggle">☀️ Light mode</div>
     </div>
 
-    <!-- MAIN -->
     <div class="main">
-
-      <div class="top-bar">
-        <div>
-          <h1>My Notes</h1>
-          <p class="subtitle">Your personal knowledge base</p>
+      <div class="topbar">
+        <div class="topbar-left">
+          <h1 class="page-title" id="page-title">My notes</h1>
+          <p class="page-sub" id="page-sub">Your personal knowledge base</p>
         </div>
-        <button class="new-note-btn" id="new-note-btn">+ New Note</button>
+        <div class="topbar-right">
+          <button class="btn-icon" id="view-grid" title="Grid view">
+            <i class="ti ti-layout-grid" aria-hidden="true"></i>
+          </button>
+          <button class="btn-icon" id="view-list" title="List view">
+            <i class="ti ti-list" aria-hidden="true"></i>
+          </button>
+          <button class="btn-new" id="new-note-btn">
+            <i class="ti ti-plus" aria-hidden="true"></i> New note
+          </button>
+        </div>
       </div>
 
-      <!-- NOTE INPUT -->
       <div class="note-input-area" id="note-input-area" style="display:none;">
         <input type="text" id="note-title" placeholder="Note title...">
         <textarea id="note-body" placeholder="Write your thoughts..."></textarea>
         <div class="input-actions">
-          <button class="cancel-btn" id="cancel-btn">Cancel</button>
-          <button class="save-btn" id="save-btn">Save Note</button>
+          <button class="btn-cancel" id="cancel-btn">Cancel</button>
+          <button class="btn-save" id="save-btn">
+            <i class="ti ti-check" aria-hidden="true"></i> Save note
+          </button>
         </div>
       </div>
 
-      <!-- NOTES LIST -->
+      <div class="chips" id="chips"></div>
+
       <div class="notes-grid" id="notes-list"></div>
 
+      <div class="search-area" id="search-area" style="display:none;">
+        <input type="text" id="search-input" placeholder="Search your notes...">
+        <div class="notes-grid" id="search-results"></div>
+      </div>
+
+      <div class="askbar">
+        <i class="ti ti-sparkles askbar-icon" aria-hidden="true"></i>
+        <input type="text" id="ask-input" placeholder="Ask Yoution anything about your notes...">
+        <button class="btn-ask" id="ask-btn">
+          <i class="ti ti-send" aria-hidden="true"></i> Ask AI
+        </button>
+      </div>
+
+      <div class="ask-answer" id="ask-answer" style="display:none;"></div>
     </div>
+
   </div>
 
   <script src="script.js"></script>
 </body>
-
 </html>
