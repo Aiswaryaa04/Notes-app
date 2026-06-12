@@ -140,7 +140,7 @@ Note title: {request.title}
 Note content: {request.body}"""
 
     response = client.chat.completions.create(
-        model="llama3-8b-8192",
+        model="llama-3.3-70b-versatile",
         messages=[{"role": "user", "content": prompt}],
         max_tokens=100
     )
@@ -176,7 +176,7 @@ Answer this question based only on the notes above:
 Be concise and helpful. If the answer isn't in the notes, say so."""
 
     response = client.chat.completions.create(
-        model="llama3-8b-8192",
+        model="llama-3.3-70b-versatile",
         messages=[{"role": "user", "content": prompt}],
         max_tokens=300
     )
