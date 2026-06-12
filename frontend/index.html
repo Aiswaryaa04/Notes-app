@@ -1,28 +1,66 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>My Notes App</title>
+  <title>Second Brain</title>
   <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
 
-  <div class="container">
+  <div class="app">
 
-    <h1>My Notes ✨</h1>
-    <p class="subtitle">Powered by FastAPI + Claude AI</p>
+    <!-- SIDEBAR -->
+    <div class="sidebar">
+      <div class="logo">🧠 Second Brain</div>
 
-    <div class="note-input-area">
-      <input type="text" id="note-title" placeholder="Note title...">
-      <textarea id="note-body" placeholder="Write your note here..."></textarea>
-      <button id="save-btn">Save Note</button>
+      <div class="streak-card">
+        <div class="streak-number" id="streak-count">0</div>
+        <div class="streak-label">day streak 🔥</div>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-label">Ask your notes</div>
+        <textarea id="ask-input" placeholder="What did I write about...?"></textarea>
+        <button class="ask-btn" id="ask-btn">Ask AI 💬</button>
+        <div id="ask-answer" class="ask-answer" style="display:none;"></div>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-label">Filter by tag</div>
+        <div id="tag-filters" class="tag-filters"></div>
+      </div>
+
+      <div class="theme-toggle" id="theme-toggle">☀️ Light mode</div>
     </div>
 
-    <div class="notes-list" id="notes-list"></div>
+    <!-- MAIN -->
+    <div class="main">
 
+      <div class="top-bar">
+        <div>
+          <h1>My Notes</h1>
+          <p class="subtitle">Your personal knowledge base</p>
+        </div>
+        <button class="new-note-btn" id="new-note-btn">+ New Note</button>
+      </div>
+
+      <!-- NOTE INPUT -->
+      <div class="note-input-area" id="note-input-area" style="display:none;">
+        <input type="text" id="note-title" placeholder="Note title...">
+        <textarea id="note-body" placeholder="Write your thoughts..."></textarea>
+        <div class="input-actions">
+          <button class="cancel-btn" id="cancel-btn">Cancel</button>
+          <button class="save-btn" id="save-btn">Save Note</button>
+        </div>
+      </div>
+
+      <!-- NOTES LIST -->
+      <div class="notes-grid" id="notes-list"></div>
+
+    </div>
   </div>
 
   <script src="script.js"></script>
