@@ -157,3 +157,10 @@
     line-height: 1.6;
     border-left: 3px solid #6c63ff;
   }
+
+  .subtitle {
+    font-size: 14px;
+    color: #999;
+    margin-top: -24px;
+    margin-bottom: 32px;
+  }
