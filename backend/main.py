@@ -1,15 +1,23 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel
 from groq import Groq
+from sqlalchemy.orm import Session
+from database import get_db, init_db, User, Note, Streak
+from auth import (
+    hash_password, verify_password,
+    create_access_token, get_current_user
+)
 from dotenv import load_dotenv
+from datetime import date
 import json
 import os
-from datetime import date
 
 load_dotenv()
 
 app = FastAPI()
+init_db()
 
 app.add_middleware(
     CORSMiddleware,
@@ -20,21 +28,22 @@ app.add_middleware(
 
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
-NOTES_FILE = "notes.json"
-STREAK_FILE = "streak.json"
-
 # ─────────────────────────────────────
-# Models
+# Pydantic models (request shapes)
 # ─────────────────────────────────────
 
-class Note(BaseModel):
-    id: int
+class SignupRequest(BaseModel):
+    name: str
+    email: str
+    password: str
+
+class NoteCreate(BaseModel):
     title: str
     body: str
     date: str
     pinned: bool = False
     tags: list = []
-    mood: str = ""
+    mood: str = "💡"
 
 class AskRequest(BaseModel):
     question: str
@@ -44,95 +53,141 @@ class TagMoodRequest(BaseModel):
     body: str
 
 # ─────────────────────────────────────
-# File helpers
+# AUTH ROUTES
 # ─────────────────────────────────────
 
-def read_notes():
-    if not os.path.exists(NOTES_FILE):
-        return []
-    with open(NOTES_FILE, "r") as f:
-        return json.load(f)
+@app.post("/auth/signup")
+def signup(request: SignupRequest, db: Session = Depends(get_db)):
+    existing = db.query(User).filter(User.email == request.email).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Email already registered")
 
-def write_notes(notes):
-    with open(NOTES_FILE, "w") as f:
-        json.dump(notes, f)
+    user = User(
+        name=request.name,
+        email=request.email,
+        password_hash=hash_password(request.password)
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
 
-def read_streak():
-    if not os.path.exists(STREAK_FILE):
-        return {"streak": 0, "last_date": ""}
-    with open(STREAK_FILE, "r") as f:
-        return json.load(f)
+    token = create_access_token({"sub": user.email})
+    return {"access_token": token, "token_type": "bearer", "name": user.name}
 
-def update_streak():
-    today = str(date.today())
-    streak_data = read_streak()
-    if streak_data["last_date"] == today:
-        return streak_data
-    yesterday = str(date.fromordinal(date.today().toordinal() - 1))
-    if streak_data["last_date"] == yesterday:
-        streak_data["streak"] += 1
-    else:
-        streak_data["streak"] = 1
-    streak_data["last_date"] = today
-    with open(STREAK_FILE, "w") as f:
-        json.dump(streak_data, f)
-    return streak_data
+@app.post("/auth/login")
+def login(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: Session = Depends(get_db)
+):
+    user = db.query(User).filter(User.email == form_data.username).first()
+    if not user or not verify_password(form_data.password, user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect email or password"
+        )
+    token = create_access_token({"sub": user.email})
+    return {"access_token": token, "token_type": "bearer", "name": user.name}
+
+@app.get("/auth/me")
+def get_me(current_user: User = Depends(get_current_user)):
+    return {"id": current_user.id, "name": current_user.name, "email": current_user.email}
 
 # ─────────────────────────────────────
-# Notes routes
+# NOTES ROUTES
 # ─────────────────────────────────────
 
 @app.get("/notes")
-def get_notes():
-    notes = read_notes()
-    pinned = [n for n in notes if n.get("pinned")]
-    unpinned = [n for n in notes if not n.get("pinned")]
-    return pinned + unpinned
+def get_notes(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    notes = db.query(Note).filter(Note.user_id == current_user.id).all()
+    pinned = [n for n in notes if n.pinned]
+    unpinned = [n for n in notes if not n.pinned]
+    result = pinned + unpinned
+    return [note_to_dict(n) for n in result]
 
 @app.post("/notes")
-def create_note(note: Note):
-    notes = read_notes()
-    notes.insert(0, note.dict())
-    write_notes(notes)
-    update_streak()
-    return note
+def create_note(
+    note: NoteCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    db_note = Note(
+        user_id=current_user.id,
+        title=note.title,
+        body=note.body,
+        date=note.date,
+        pinned=note.pinned,
+        tags=json.dumps(note.tags),
+        mood=note.mood
+    )
+    db.add(db_note)
+    db.commit()
+    db.refresh(db_note)
+    update_streak(current_user.id, db)
+    return note_to_dict(db_note)
 
 @app.delete("/notes/{note_id}")
-def delete_note(note_id: int):
-    notes = read_notes()
-    updated = [n for n in notes if n["id"] != note_id]
-    write_notes(updated)
+def delete_note(
+    note_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    note = db.query(Note).filter(
+        Note.id == note_id,
+        Note.user_id == current_user.id
+    ).first()
+    if not note:
+        raise HTTPException(status_code=404, detail="Note not found")
+    db.delete(note)
+    db.commit()
     return {"message": "Note deleted"}
 
 @app.patch("/notes/{note_id}/pin")
-def toggle_pin(note_id: int):
-    notes = read_notes()
-    for note in notes:
-        if note["id"] == note_id:
-            note["pinned"] = not note.get("pinned", False)
-    write_notes(notes)
+def toggle_pin(
+    note_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    note = db.query(Note).filter(
+        Note.id == note_id,
+        Note.user_id == current_user.id
+    ).first()
+    if not note:
+        raise HTTPException(status_code=404, detail="Note not found")
+    note.pinned = not note.pinned
+    db.commit()
     return {"message": "Pin toggled"}
 
 # ─────────────────────────────────────
-# Streak route
+# STREAK ROUTE
 # ─────────────────────────────────────
 
 @app.get("/streak")
-def get_streak():
-    return read_streak()
+def get_streak(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    streak = db.query(Streak).filter(Streak.user_id == current_user.id).first()
+    if not streak:
+        return {"streak": 0}
+    return {"streak": streak.streak}
 
 # ─────────────────────────────────────
-# AI routes
+# AI ROUTES
 # ─────────────────────────────────────
 
 @app.post("/ai/tags-and-mood")
-def get_tags_and_mood(request: TagMoodRequest):
+def get_tags_and_mood(
+    request: TagMoodRequest,
+    current_user: User = Depends(get_current_user)
+):
     prompt = f"""Analyze this note and return ONLY a JSON object with no extra text:
 {{
   "mood": "one emoji that best represents the mood",
   "tags": ["tag1", "tag2", "tag3"]
 }}
-
 Tags should be short single words like: idea, todo, learning, personal, work, focus, creative, reminder
 Pick maximum 3 tags. Pick exactly 1 mood emoji.
 
@@ -147,33 +202,35 @@ Note content: {request.body}"""
 
     text = response.choices[0].message.content.strip()
     try:
-        # clean up any markdown fences
         text = text.replace("```json", "").replace("```", "").strip()
         result = json.loads(text)
         return result
     except:
         return {"mood": "💡", "tags": ["idea"]}
 
-
 @app.post("/ai/ask")
-def ask_notes(request: AskRequest):
-    notes = read_notes()
+def ask_notes(
+    request: AskRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    notes = db.query(Note).filter(Note.user_id == current_user.id).all()
     if not notes:
         return {"answer": "You have no notes yet. Start writing!"}
 
     notes_text = "\n\n".join([
-        f"Note {i+1} — {n['title']}:\n{n['body']}"
+        f"Note {i+1} — {n.title}:\n{n.body}"
         for i, n in enumerate(notes)
     ])
 
-    prompt = f"""You are a helpful assistant. The user has the following personal notes:
+    prompt = f"""You are a helpful assistant. The user has these personal notes:
 
 {notes_text}
 
 Answer this question based only on the notes above:
 {request.question}
 
-Be concise and helpful. If the answer isn't in the notes, say so."""
+Be concise and helpful."""
 
     response = client.chat.completions.create(
         model="llama-3.3-70b-versatile",
@@ -182,3 +239,40 @@ Be concise and helpful. If the answer isn't in the notes, say so."""
     )
 
     return {"answer": response.choices[0].message.content.strip()}
+
+# ─────────────────────────────────────
+# HELPERS
+# ─────────────────────────────────────
+
+def note_to_dict(note: Note):
+    return {
+        "id": note.id,
+        "title": note.title,
+        "body": note.body,
+        "date": note.date,
+        "pinned": note.pinned,
+        "tags": json.loads(note.tags) if note.tags else [],
+        "mood": note.mood
+    }
+
+def update_streak(user_id: int, db: Session):
+    today = str(date.today())
+    streak = db.query(Streak).filter(Streak.user_id == user_id).first()
+
+    if not streak:
+        streak = Streak(user_id=user_id, streak=1, last_date=today)
+        db.add(streak)
+        db.commit()
+        return
+
+    if streak.last_date == today:
+        return
+
+    yesterday = str(date.fromordinal(date.today().toordinal() - 1))
+    if streak.last_date == yesterday:
+        streak.streak += 1
+    else:
+        streak.streak = 1
+
+    streak.last_date = today
+    db.commit()
